@@ -42,10 +42,11 @@ class PolyBook {
     void            init(const std::string& bookfile);
     Stockfish::Move probe(Stockfish::Position& pos, bool bestBookMove, int width = 10);
 
-   private:
+    // Now public for access from "search.cpp"
     Stockfish::Key  polyglot_key(const Stockfish::Position& pos);
     Stockfish::Move pg_move_to_sf_move(const Stockfish::Position& pos, unsigned short pg_move);
 
+   private:
     int find_first_key(uint64_t key);
     int get_key_data();
 

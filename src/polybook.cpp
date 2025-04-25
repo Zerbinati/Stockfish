@@ -395,7 +395,9 @@ Move PolyBook::probe(Position& pos, bool bestBookMove, int width) {
         for (int i = 0; i < n; ++i)
         {
             int w = polyhash[index_first + i].weight;
-            double s = std::pow(static_cast<double>(w), exponent);
+            int l = polyhash[index_first + i].learn;
+            double learn_adjustment = static_cast<double>(l) / 1000.0;
+            double s = std::pow(static_cast<double>(w) + learn_adjustment, exponent);
             scores[i] = s;
             total += s;
         }
