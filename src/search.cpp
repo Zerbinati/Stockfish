@@ -217,7 +217,7 @@ void Search::Worker::start_searching() {
         if (bookMove != Move::none() && bookIndex >= 0)
         {
             Key key = polybook[bookIndex].polyglot_key(rootPos);
-            uint16_t move16 = polybook[bookIndex].pg_move_to_sf_move(rootPos, bookMove);
+            uint16_t move16 = polybook[bookIndex].sf_move_to_pg_move(rootPos, bookMove);
 
             std::ofstream log("book_usage.log", std::ios::app);
             log << "BOOK_ENTRY book=Book" << (bookIndex + 1)

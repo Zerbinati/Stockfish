@@ -45,6 +45,7 @@ class PolyBook {
     // Now public for access from "search.cpp"
     Stockfish::Key  polyglot_key(const Stockfish::Position& pos);
     Stockfish::Move pg_move_to_sf_move(const Stockfish::Position& pos, unsigned short pg_move);
+    uint16_t sf_move_to_pg_move(const Stockfish::Position& pos, Stockfish::Move m);
 
    private:
     int find_first_key(uint64_t key);
