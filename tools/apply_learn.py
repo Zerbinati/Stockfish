@@ -1,91 +1,87 @@
+# apply_learn.py
+import os
+import shutil
 import subprocess
-import datetime
+from datetime import datetime
 
 # Configuration
-LOG_FILE = "book_usage.log"
+LOG_FILE = "book_usage_ready.log"
+BOOK_FILE = "book1.bin"  # Change if needed
+LEARN_TOOL = "learn_tool.exe"
 HISTORY_LOG = "learn_update_history.log"
+BACKUP_FOLDER = "backups"
 
-DELTA_MAP = {
+# Delta values per result type
+DELTA_VALUES = {
     "win": 500,
     "loss": -500,
     "draw": 0
 }
 
-# Parse one line and extract book, key, move
-def parse_log_line(line):
-    parts = line.strip().split()
-    book = None
-    key = None
-    move = None
-    for part in parts:
-        if part.startswith("book="):
-            book = part[5:]
-        elif part.startswith("key="):
-            key = part[4:]
-        elif part.startswith("move="):
-            move = part[5:]
-    return book, key, move
+def apply_learn():
+    if not os.path.exists(LOG_FILE):
+        print(f"Log file '{LOG_FILE}' not found.")
+        return
 
-# Process a block of one game
-def process_game_block(entries, result):
-    delta = DELTA_MAP.get(result, 0)
-    print(f"\nProcessing game with result: {result} (delta = {delta})")
+    if not os.path.exists(BOOK_FILE):
+        print(f"Book file '{BOOK_FILE}' not found.")
+        return
 
-    with open(HISTORY_LOG, "a") as hist:
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        hist.write(f"\n=== Game processed at {timestamp} (Result: {result}) ===\n")
-
-        for line in entries:
-            if not line.startswith("BOOK_ENTRY"):
-                continue
-
-            book, key, move = parse_log_line(line)
-            if book and key and move:
-                book_file = "book1.bin" if book.lower() == "book1" else "book2.bin"
-                print(f"Updating: {book} ({book_file}) key={key}, move={move}")
-                subprocess.run(["learn_tool.exe", book_file, key, move, str(delta)])
-
-                hist.write(f"{book_file} key={key} move={move} delta={delta}\n")
-
-# Main batch processing
-def main():
-    current_block = []
-    current_result = None
-    inside_game = False
-    games_processed = 0
-
+    # Read and parse the log
     with open(LOG_FILE, "r") as f:
-        for line in f:
-            line = line.strip()
+        lines = [line.strip() for line in f if line.strip()]
+    
+    result = None
+    entries = []
 
-            if line == "# GAME_START":
-                inside_game = True
-                current_block = []
-                current_result = None
+    for line in lines:
+        if line.startswith("# RESULT:"):
+            result = line.split(":")[1].strip().lower()
+        elif line.startswith("BOOK_ENTRY"):
+            parts = line.split()
+            key = None
+            move = None
+            for p in parts:
+                if p.startswith("key="):
+                    key = p.split("=")[1]
+                elif p.startswith("move="):
+                    move = p.split("=")[1]
+            if key and move:
+                entries.append((key, move))
 
-            elif line.startswith("# RESULT:") and inside_game:
-                current_result = line.split(":")[1].strip().lower()
+    if not result or result not in DELTA_VALUES:
+        print("Invalid or missing result in log.")
+        return
 
-            elif line == "# GAME_END" and inside_game:
-                if current_result:
-                    process_game_block(current_block, current_result)
-                    games_processed += 1
-                else:
-                    print("\nWarning: game block missing result, skipped.")
-                inside_game = False
-                current_block = []
+    delta = DELTA_VALUES[result]
 
-            elif inside_game:
-                current_block.append(line)
+    if not entries:
+        print("No BOOK_ENTRY found in log.")
+        return
 
-    print(f"\n✅ All done. {games_processed} games processed.")
+    # Backup the book file
+    os.makedirs(BACKUP_FOLDER, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = os.path.join(BACKUP_FOLDER, f"{BOOK_FILE}.{timestamp}.bak")
+    shutil.copy2(BOOK_FILE, backup_path)
+    print(f"Backup created: {backup_path}")
 
-    # Clear the original log
-    with open(LOG_FILE, "w") as f:
-        f.write("")  # Empty the log
+    print(f"\nApplying learning for result: {result.upper()} (delta = {delta})")
+    print(f"Updating {len(entries)} entries...\n")
 
-    print("🧹 book_usage.log has been cleared.")
-    print(f"📄 Updates saved to {HISTORY_LOG}")
+    with open(HISTORY_LOG, "a") as history:
+        for key, move in entries:
+            cmd = [LEARN_TOOL, BOOK_FILE, key, move, str(delta)]
+            try:
+                subprocess.run(cmd, check=True)
+                print(f"Updated: key={key}, move={move}, delta={delta}")
+                history.write(f"{BOOK_FILE} | key={key} | move={move} | delta={delta} | result={result} | time={timestamp}\n")
+            except subprocess.CalledProcessError:
+                print(f"Failed to update: key={key}, move={move}")
+
+    # Clear the log after processing
+    open(LOG_FILE, "w").close()
+    print("\nLog cleared.")
 
 if __name__ == "__main__":
-    main()
+    apply_learn()
