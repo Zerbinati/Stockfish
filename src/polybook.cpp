@@ -24,9 +24,13 @@
 #include "misc.h"
 #include <sys/timeb.h>
 #include <cmath>
+#include "bitboard.h"
+#include "position.h"
+#include "types.h"
+
 
 using namespace std;
-//using namespace Stockfish;
+using namespace Stockfish;
 
 namespace Stockfish {
 
@@ -495,55 +499,51 @@ Move PolyBook::pg_move_to_sf_move(const Position& pos, unsigned short pg_move) {
     for (const auto& m : MoveList<LEGAL>(pos))
     {
         if (move.raw()
-            == (m.raw() & (~(3 << 14))))  //  compare with MoveType (bit 14-15)  masked out
+            == (m.raw() & (~(3 << 14))))  //  compare with MoveType (bit 14-15) masked out
             return m;
     }
 
     return Move::none();
 }
-int PolyBook::find_first_key(uint64_t key) {
-    index_first        = -1;
-    index_count        = 0;
-    index_weight_count = 0;
-    index_best         = -1;
-    index_rand         = -1;
 
-    int start = 0;
-    int end   = keycount;
+// Convert a Stockfish Move to a Polyglot move (uint16_t)
+uint16_t PolyBook::sf_move_to_pg_move(const Position& pos, Move m) {
+    Square from = m.from_sq();
+    Square to   = m.to_sq();
+    uint16_t move16 = (uint16_t(from) << 6) | uint16_t(to);
 
-    for (;;)
+    Piece pc = pos.piece_on(from);
+
+    if (type_of(pc) == PAWN)
     {
-        int mid = (end + start) / 2;
-
-        if (polyhash[mid].key < key)
-            start = mid;
-        else
+        if (to == pos.ep_square())
         {
-            if (polyhash[mid].key > key)
-                end = mid;
-            else
-            {
-                start = max(mid - 4, 0);
-                end   = min(mid + 4, keycount);
-            }
+            Piece captured = make_piece(~color_of(pc), PAWN);
+            (void)captured;
         }
 
-        if (end - start < 9)
-            break;
+        if (rank_of(to) == RANK_1 || rank_of(to) == RANK_8)
+            move16 |= (uint16_t(QUEEN - 2) << 12);
     }
 
-    for (int i = start; i < end; i++)
-    {
-        if (key == polyhash[i].key)
-        {
+    return move16;
+}
+
+int PolyBook::find_first_key(uint64_t key) {
+    index_first = -1;
+    index_count = 0;
+    index_weight_count = 0;
+    index_best = -1;
+    index_rand = -1;
+
+    for (int i = 0; i < keycount; i++) {
+        if (polyhash[i].key == key) {
             index_first = i;
-            while ((index_first > 0) && (key == polyhash[index_first - 1].key))
-                index_first--;
             return get_key_data();
         }
     }
 
-    return -1;
+    return 0;
 }
 
 int PolyBook::get_key_data() {
