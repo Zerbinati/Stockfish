@@ -42,6 +42,50 @@ Stockfish with it.
 
 See also the Stockfish [documentation][wiki-usage-link] for further usage help.
 
+## Polyglot Book Learning Support
+This update adds full learning support for Polyglot .bin opening books.
+
+## Features:
+Supports Book1 and Book2 independently
+
+Moves played from the book are logged with:
+
+Position key (polyglot_key)
+
+Move code (sf_move_to_pg_move)
+
+Book origin (Book1 or Book2)
+
+Log format is structured for automatic post-game processing
+
+## Learning Automation:
+A Python script (apply_learn_batch.py) processes the log:
+
+Reads all games from book_usage.log
+
+Recognizes results via # RESULT: win/loss/draw
+
+Applies the appropriate delta (+500/-500/0) to the learn field
+
+Updates either book1.bin or book2.bin accordingly
+
+Supports multiple games per session (# GAME_START/# GAME_END)
+
+Automatically clears the log after processing
+
+Saves all applied changes in learn_update_history.log
+
+## Requirements:
+
+learn_tool.exe (compiled learning updater)
+
+Python 3.x installed and in system PATH
+
+Run it:
+
+python apply_learn_batch.py
+Or via run_apply_learn_batch.bat for click-to-use workflow.
+
 ## Files
 
 This distribution of Stockfish consists of the following files:
