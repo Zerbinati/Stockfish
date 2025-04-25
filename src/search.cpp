@@ -32,6 +32,7 @@
 #include <ratio>
 #include <string>
 #include <utility>
+#include <fstream>
 
 #include "bitboard.h"
 #include "evaluate.h"
@@ -180,6 +181,7 @@ void Search::Worker::start_searching() {
     tt.new_search();
 
     Move bookMove = Move::none();
+    int bookIndex = -1;
 
     if (rootMoves.empty())
     {
@@ -191,16 +193,36 @@ void Search::Worker::start_searching() {
     {
         if (!limits.infinite && !limits.mate)
         {
-if ((bool) options["Book1"] && rootPos.game_ply() / 2 < (int) options["Book1 Depth"])
-    bookMove = polybook[0].probe(rootPos,
-                                 (bool) options["Book1 BestBookMove"],
-                                 (int) options["Book1 Width"]);
+            if ((bool) options["Book1"] && rootPos.game_ply() / 2 < (int) options["Book1 Depth"])
+            {
+                bookMove = polybook[0].probe(rootPos,
+                                             (bool) options["Book1 BestBookMove"],
+                                             (int) options["Book1 Width"]);
+                if (bookMove != Move::none())
+                    bookIndex = 0;
+            }
 
-if (bookMove == Move::none() && (bool) options["Book2"]
-    && rootPos.game_ply() / 2 < (int) options["Book2 Depth"])
-    bookMove = polybook[1].probe(rootPos,
-                                 (bool) options["Book2 BestBookMove"],
-                                 (int) options["Book2 Width"]);
+            if (bookMove == Move::none() && (bool) options["Book2"]
+                && rootPos.game_ply() / 2 < (int) options["Book2 Depth"])
+            {
+                bookMove = polybook[1].probe(rootPos,
+                                             (bool) options["Book2 BestBookMove"],
+                                             (int) options["Book2 Width"]);
+                if (bookMove != Move::none())
+                    bookIndex = 1;
+            }
+        }
+
+        // Book move log
+        if (bookMove != Move::none() && bookIndex >= 0)
+        {
+            Key key = polybook[bookIndex].polyglot_key(rootPos);
+            uint16_t move16 = polybook[bookIndex].pg_move_to_sf_move(rootPos, bookMove);
+
+            std::ofstream log("book_usage.log", std::ios::app);
+            log << "BOOK_ENTRY book=Book" << (bookIndex + 1)
+                << " key=" << std::hex << key
+                << " move=" << move16 << std::dec << "\n";
         }
 
         if (bookMove != Move::none()
@@ -217,6 +239,7 @@ if (bookMove == Move::none() && (bool) options["Book2"]
             iterative_deepening();      // main thread start searching
         }
     }
+
 
     // When we reach the maximum depth, we can arrive here without a raise of
     // threads.stop. However, if we are pondering or in an infinite search,
