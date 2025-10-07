@@ -75,6 +75,7 @@ int correction_value(const Worker& w, const Position& pos, const Stack* const ss
     const auto  bnpcv = w.nonPawnCorrectionHistory[non_pawn_index<BLACK>(pos)][BLACK][us];
     const auto  cntcv =
       m.is_ok() ? (*(ss - 2)->continuationCorrectionHistory)[pos.piece_on(m.to_sq())][m.to_sq()]
+                    + (*(ss - 4)->continuationCorrectionHistory)[pos.piece_on(m.to_sq())][m.to_sq()]
                  : 8;
 
     return 9536 * pcv + 8494 * micv + 10132 * (wnpcv + bnpcv) + 7156 * cntcv;
@@ -103,8 +104,12 @@ void update_correction_history(const Position& pos,
       << bonus * nonPawnWeight / 128;
 
     if (m.is_ok())
-        (*(ss - 2)->continuationCorrectionHistory)[pos.piece_on(m.to_sq())][m.to_sq()]
-          << bonus * 137 / 128;
+    {
+        const Square to = m.to_sq();
+        const Piece  pc = pos.piece_on(m.to_sq());
+        (*(ss - 2)->continuationCorrectionHistory)[pc][to] << bonus * 137 / 128;
+        (*(ss - 4)->continuationCorrectionHistory)[pc][to] << bonus * 64 / 128;
+    }
 }
 
 Value value_to_tt(Value v, int ply);
