@@ -293,14 +293,16 @@ if (bookMove == Move::none() && (bool) options["Book2"]
                 if (sum <= 0.0) sum = 1.0;
                 for (double& v : w) v /= sum; // normalize
 
-                // RNG with optional deterministic seed from UCI option
-                static uint64_t savedSeed = 0;
-                if (!savedSeed)
+                // RNG with optional deterministic base seed (UCI "Random Seed")
+                // Derive a per-position seed so choices differ across positions,
+                // while runs remain reproducible when Random Seed > 0.
+                static uint64_t baseSeed = 0;
+                if (!baseSeed)
                 {
                     const int uciSeed = int(options["Random Seed"]);
-                    savedSeed = uciSeed ? uint64_t(uciSeed) : now();
+                    baseSeed = uciSeed ? uint64_t(uciSeed) : now(); // clock when seed=0
                 }
-                PRNG rng(savedSeed);
+                PRNG rng(baseSeed ^ uint64_t(rootPos.key()));
 
                 // Sample from cumulative distribution
                 const double r = rng.rand<unsigned>() / double(std::numeric_limits<unsigned>::max());
