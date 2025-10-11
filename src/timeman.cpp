@@ -59,10 +59,13 @@ void TimeManagement::init(Search::LimitsType& limits,
     if (limits.time[us] == 0)
         return;
 
-    TimePoint moveOverhead = TimePoint(options["Move Overhead"]);
+    TimePoint moveOverhead = TimePoint(options["MoveOverhead"]);
 
-    // optScale is a percentage of available time to use for the current move.
-    // maxScale is a multiplier applied to optimumTime.
+    // Extra UCI knobs
+    TimePoint minThinkingTime = TimePoint(options["Minimum Thinking Time"]); // ms
+    int       slowMoverPct    = int(options["Slow Mover"]);                  // percent (100 = no change)
+
+    // optScale is a percentage of available time to use for the current move.    // maxScale is a multiplier applied to optimumTime.
     double optScale, maxScale;
 
     // If we have to play in 'nodes as time' mode, then convert from time
@@ -79,6 +82,9 @@ void TimeManagement::init(Search::LimitsType& limits,
         limits.inc[us] *= npmsec;
         limits.npmsec = npmsec;
         moveOverhead *= npmsec;
+
+        // Keep the same minimum thinking floor when using nodes as time
+        minThinkingTime *= npmsec;
     }
 
     // These numbers are used where multiplications, divisions or comparisons
@@ -128,13 +134,41 @@ void TimeManagement::init(Search::LimitsType& limits,
         maxScale = 1.3 + 0.11 * (centiMTG / 100.0);
     }
 
-    // Limit the maximum possible time for this move
+    // Compute baseline allocation for this move
     optimumTime = TimePoint(optScale * timeLeft);
     maximumTime =
-      TimePoint(std::min(0.825179 * limits.time[us] - moveOverhead, maxScale * optimumTime)) - 10;
+      TimePoint(std::min(0.825179 * limits.time[us] - moveOverhead, maxScale * optimumTime));
 
-    if (options["Ponder"])
-        optimumTime += optimumTime / 4;
+    // Hard cap: never exceed (available time - overhead)
+    const TimePoint usableTime = std::max<TimePoint>(0, limits.time[us] - moveOverhead);
+
+    // Enforce minimum thinking time floor BEFORE slow-mover scaling
+    optimumTime = std::max(optimumTime, minThinkingTime);
+
+    // Apply Slow Mover to the allocation (do not scale the global pool)
+    // 100 = no change, 110 = +10%, 90 = -10%
+    optimumTime = TimePoint((int64_t(optimumTime) * slowMoverPct) / 100);
+
+    // Keep maximum >= optimum after scaling
+    maximumTime = std::max(maximumTime, optimumTime);
+
+    // Ponder bonus: boost both to preserve max >= opt
+    if (options["Ponder"]) {
+        optimumTime += optimumTime / 4;   // +25%
+        maximumTime += maximumTime / 4;
+    }
+
+    // Clamp both by the hard cap
+    optimumTime = std::min(optimumTime, usableTime);
+    maximumTime = std::min(maximumTime, usableTime);
+
+    // Cosmetic margin: subtract 10 ms only if there is room
+    if (maximumTime > optimumTime + 10)
+        maximumTime -= 10;
+
+    // Final safety: reassert ordering and the floor
+    optimumTime = std::max(optimumTime, minThinkingTime);
+    maximumTime = std::max(maximumTime, optimumTime);
 }
 
 }  // namespace Stockfish
