@@ -113,20 +113,20 @@ class Logger {
 }  // namespace
 
 
-// Returns the full name of the current CorChess 5 version.
+// Returns the full name of the current CorChess version.
 //
 // For local dev compiles we try to append the commit SHA and
 // commit date from git. If that fails only the local compilation
 // date is set and "nogit" is specified:
-//      CorChess 5 dev-YYYYMMDD-SHA
+//      CorChess dev-YYYYMMDD-SHA
 //      or
-//      CorChess 5 dev-YYYYMMDD-nogit
+//      CorChess dev-YYYYMMDD-nogit
 //
 // For releases (non-dev builds) we only include the version number:
-//      CorChess 5 version
+//      CorChess version
 std::string engine_version_info() {
     std::stringstream ss;
-    ss << "CorChess 5 " << version << std::setfill('0');
+    ss << "CorChessMZ " << version << std::setfill('0');
 
     if constexpr (version == "dev")
     {
@@ -158,7 +158,7 @@ std::string engine_version_info() {
 
 std::string engine_info(bool to_uci) {
     return engine_version_info() + (to_uci ? "\nid author " : " by ")
-         + "I. Ivec, the Stockfish developers (see AUTHORS file)";
+         + "M.Z, I. Ivec, the Stockfish developers (see AUTHORS file)";
 }
 
 
