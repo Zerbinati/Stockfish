@@ -174,6 +174,10 @@ void Search::Worker::start_searching() {
                             main_manager()->originalTimeAdjust);
     tt.new_search();
 
+    // Initialize Variety config once per search (cached in this worker)
+    varietyCfg.enabled  = int(options["Variety"]);
+    varietyCfg.maxScore = int(options["Variety Max Score"]);
+    varietyCfg.maxMoves = int(options["Variety Max Moves"]);
     Move bookMove = Move::none();
 
     if (rootMoves.empty())
@@ -1698,6 +1702,29 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
                 else
                     break;  // Fail high
             }
+        }
+    }
+
+    // Small randomization of bestValue to increase move variety when
+    // evaluations are close and we are still in the opening phase.
+    // Uses per-worker cached config (this->varietyCfg).
+
+    const auto& cfg = this->varietyCfg;
+
+    if (cfg.enabled && std::abs(UCIEngine::to_cp(bestValue, pos)) < cfg.maxScore)
+    {
+        if (bestValue + cfg.enabled * PawnValue / 100 >= 0
+            && pos.game_ply() / 2 < cfg.maxMoves)
+        {
+            const auto varietyMinRange = nodes / 2;
+            const auto varietyMaxRange = nodes * 2;
+
+            thread_local PRNG rng(now());
+
+            bestValue += static_cast<Value>(
+                (rng.rand<std::uint64_t>() % (varietyMaxRange - varietyMinRange + 1)
+                 + varietyMinRange) % (cfg.enabled + 1)
+            );
         }
     }
 

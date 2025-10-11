@@ -128,12 +128,12 @@ Engine::Engine(std::optional<std::string> path) :
     options.add("Syzygy50MoveRule", Option(true));
 
     options.add("SyzygyProbeLimit", Option(7, 0, 7));
-    
+
     options.add("Book1", Option(false));
 
     options.add("Book1 File", Option("", [](const Option& o) {
-    polybook[0].init(o);
-    return std::nullopt;
+        polybook[0].init(o);
+        return std::nullopt;
       }));
 
     options.add("Book1 BestBookMove", Option(false));
@@ -145,8 +145,8 @@ Engine::Engine(std::optional<std::string> path) :
     options.add("Book2", Option(false));
 
     options.add("Book2 File", Option("", [](const Option& o) {
-    polybook[1].init(o);
-    return std::nullopt;
+        polybook[1].init(o);
+        return std::nullopt;
       }));
 
     options.add("Book2 BestBookMove", Option(false));
@@ -154,6 +154,24 @@ Engine::Engine(std::optional<std::string> path) :
     options.add("Book2 Depth", Option(255, 1, 350));
 
     options.add("Book2 Width", Option(1, 1, 10));
+
+    options.add("Variety",
+                Option(0, 0, 40, [](const Option& opt) {
+                    sync_cout << "info string Variety = " << int(opt) << sync_endl;
+                    return std::nullopt;
+                }));
+
+    options.add("Variety Max Score",
+                Option(50, 0, 300, [](const Option& opt) {
+                    sync_cout << "info string Variety Max Score = " << int(opt) << sync_endl;
+                    return std::nullopt;
+                }));
+
+    options.add("Variety Max Moves",
+                Option(12, 0, 60, [](const Option& opt) {
+                    sync_cout << "info string Variety Max Moves = " << int(opt) << sync_endl;
+                    return std::nullopt;
+                }));
 
     options.add(  //
       "EvalFile", Option(EvalFileDefaultNameBig, [this](const Option& o) {
