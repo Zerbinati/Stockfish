@@ -182,15 +182,11 @@ Engine::Engine(std::optional<std::string> path) :
                     return std::nullopt;
                 }));
 
-    options.add("Random Open Plies",    Option(16, 0, 100));      // Active only in the first N plies
+    options.add("Random Op. Plies", Option(16, 0, 100));
 
-    options.add("Random Open MultiPV",  Option(3,  1, 64));       // Ensure at least this MultiPV early
+    options.add("Random Op. MultiPV", Option(4, 1, 500));
 
-    options.add("Random Open DeltaCp",  Option(25, 0, 500));      // Eligible window around best (centipawns)
-
-    options.add("Random Open SoftmaxT", Option(12, 1, 200));      // Softmax temperature in cp (higher = more random)
-
-    options.add("Random Seed",          Option(0,  0, 1000000));  // 0 = nondeterministic; >0 = reproducible
+    options.add("Random Op. Score", Option(20, 0, 10000));
 
     options.add(  //
       "EvalFile", Option(EvalFileDefaultNameBig, [this](const Option& o) {

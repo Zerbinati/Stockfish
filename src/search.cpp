@@ -259,71 +259,6 @@ if (bookMove == Move::none() && (bool) options["Book2"]
         || bestThread->rootMoves[0].extract_ponder_from_tt(tt, rootPos))
         ponder = UCIEngine::move(bestThread->rootMoves[0].pv[1], rootPos.is_chess960());
 
-    // Random Open selection (pick among near-equal root moves)
-    // Apply only at root, in early plies, and avoid ponder/infinite/mate modes.
-    if (!main_manager()->ponder && !limits.infinite && !limits.mate
-        && rootPos.game_ply() < int(options["Random Open Plies"]))
-    {
-        auto& rms = bestThread->rootMoves; // already sorted by score (best at index 0)
-        if (!rms.empty() && rms[0].pv[0] != Move::none())
-        {
-            const int deltaCp = int(options["Random Open DeltaCp"]);
-            int tempCp = int(options["Random Open SoftmaxT"]);
-            if (tempCp < 1) tempCp = 1; // guard
-
-            // Determine how many moves are within deltaCp from the best score; include index 0.
-            const Value best = rms[0].score;
-            int maxPV = 0;
-            for (int i = 1; i < (int)rms.size(); ++i)
-            {
-                if (rms[i].score + deltaCp >= best) maxPV = i; else break;
-            }
-
-            if (maxPV > 0) // at least one plausible alternative exists
-            {
-                // Softmax weights: w_i = exp((score_i - best) / tempCp)
-                std::vector<double> w(maxPV + 1);
-                w[0] = 1.0; // exp(0)
-                for (int i = 1; i <= maxPV; ++i)
-                {
-                    const double x = double(rms[i].score - best) / double(tempCp);
-                    w[i] = std::exp(x);
-                }
-                double sum = 0.0; for (double v : w) sum += v;
-                if (sum <= 0.0) sum = 1.0;
-                for (double& v : w) v /= sum; // normalize
-
-                // RNG with optional deterministic base seed (UCI "Random Seed")
-                // Derive a per-position seed so choices differ across positions,
-                // while runs remain reproducible when Random Seed > 0.
-                static uint64_t baseSeed = 0;
-                if (!baseSeed)
-                {
-                    const int uciSeed = int(options["Random Seed"]);
-                    baseSeed = uciSeed ? uint64_t(uciSeed) : now(); // clock when seed=0
-                }
-                PRNG rng(baseSeed ^ uint64_t(rootPos.key()));
-
-                // Sample from cumulative distribution
-                const double r = rng.rand<unsigned>() / double(std::numeric_limits<unsigned>::max());
-                double acc = 0.0;
-                int pick = 0;
-                for (int i = 0; i <= maxPV; ++i) { acc += w[i]; if (r <= acc) { pick = i; break; } }
-
-                // If we picked an alternative (pick > 0), move it to the front across all threads for consistency
-                if (pick > 0)
-                {
-                    for (auto&& th : threads)
-                    {
-                        auto& v = th->worker.get()->rootMoves;
-                        if (pick < (int)v.size())
-                            std::swap(v[0], v[pick]);
-                    }
-                }
-            }
-        }
-    }
-
     auto bestmove = UCIEngine::move(bestThread->rootMoves[0].pv[0], rootPos.is_chess960());
     main_manager()->updates.onBestmove(bestmove, ponder);
 }
@@ -375,16 +310,15 @@ void Search::Worker::iterative_deepening() {
     }
 
     size_t multiPV = size_t(options["MultiPV"]);
+    if (rootPos.game_ply() < int(options["Random Op. Plies"]))
+        multiPV = int(options["Random Op. MultiPV"]);
+
     Skill skill(options["Skill Level"], options["UCI_LimitStrength"] ? int(options["UCI_Elo"]) : 0);
 
     // When playing with strength handicap enable MultiPV search that we will
     // use behind-the-scenes to retrieve a set of possible moves.
     if (skill.enabled())
         multiPV = std::max(multiPV, size_t(4));
-
-    // Opening variety: raise MultiPV in the first N plies to gather alternatives
-    if (rootPos.game_ply() < int(options["Random Open Plies"]))
-        multiPV = std::max(multiPV, size_t(int(options["Random Open MultiPV"])));
 
     multiPV = std::min(multiPV, rootMoves.size());
 
@@ -643,6 +577,19 @@ void Search::Worker::iterative_deepening() {
         std::swap(rootMoves[0],
                   *std::find(rootMoves.begin(), rootMoves.end(),
                              skill.best ? skill.best : skill.pick_best(rootMoves, multiPV)));
+
+    int maxPV=0;
+    for (unsigned int i=1; i<rootMoves.size(); ++i)
+        if (rootMoves[i].score + PawnValue * int(options["Random Op. Score"]) / 100 > rootMoves[0].score)
+            maxPV=i;
+    static PRNG rng(now());
+    int iPV;
+    if (maxPV > 0)
+        iPV = rng.rand<unsigned>() % maxPV + 1;
+    else
+        iPV = 0;
+    std::swap(rootMoves[0], rootMoves[iPV]);
+
 }
 
 
